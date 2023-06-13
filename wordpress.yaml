@@ -1,0 +1,96 @@
+---
+- name: wordpress
+  hosts: web1
+  tasks: 
+  - name: install
+    yum:
+      name: "{{ item }}"
+      state: latest
+    loop:
+      - httpd
+      - wget
+      - yum-utils
+      - epel-release
+      - http://rpms.remirepo.net/enterprise/remi-release-7.rpm
+  - name: shell
+    shell:
+      'wget https://ko.wordpress.org/wordpress-5.8.6-ko_KR.tar.gz'
+  - name: tar
+    shell:
+      'tar xvfz wordpress-5.8.6-ko_KR.tar.gz'
+#  - name: copy
+#    copy:
+#      src: -a /wordpress/*
+#      dest: /var/www/html/
+#      remote_src: yes
+  - name: shell
+    shell: 
+      'cp -a ./wordpress/* /var/www/html/'
+  - name: shell
+    shell:
+      'cp /var/www/html/wp-config-sample.php /var/www/html/wp-config.php'
+  - name: lineinfile
+    lineinfile:
+      path: /etc/httpd/conf/httpd.conf
+      regexp: 'DirectoryIndex index.html/'
+      line: 'DirectoryIndex index.php/'
+  - name: php74
+    shell:
+      'yum-config-manager --enable remi-php74'
+  - name: install php service
+    yum:
+      name: "{{ item }}"
+      state: latest
+    loop:
+      - php
+      - php-common
+      - php-opcache
+      - php-mcrypt
+      - php-cli
+      - php-gd
+      - php-curl
+      - php-mysqlnd
+  - name: health index
+    lineinfile: 
+      path: /etc/httpd/conf/httpd.conf
+      regexp: 'DirectoryIndex health.html'
+      line: 'DirectoryIndex index.php'
+#  - name: lineinfile
+#    lineinfile: 
+#      path: /var/www/html/wp-config.php
+#      regexp: 'database_name_here'
+#      line: 'wordpress'
+#  - name: lineinfile
+#    lineinfile:
+#      path: /var/www/html/wp-config.php
+#      regexp: 'username_here'
+#      line: 'root1'
+#  - name: lineinfile
+#    lineinfile:
+#      path: /var/www/html/wp-config.php
+#      regexp: 'password_here'
+#      line: 'It12345!'
+#  - name: lineinfile
+#    lineinfile:
+#      path: /var/www/html/wp-config.php
+#      regexp: 'localhost'
+#      line: 'db-gscvv.cdb.ntruss.com'
+  - name: wp-config.php file change
+    lineinfile:
+      path: /var/www/html/wp-config.php
+      regexp: "{{ item.src }}"
+      line: "{{ item.dest }}"
+    loop:
+      - {src: "database_name_here", dest: "wordpress"}
+      - {src: "username_here", dest: "root1"}
+      - {src: "password_here", dest: "It12345!"}
+      - {src: "localhost", dest: "10.0.0.4"}
+  - name: start httpd
+    shell:
+      'systemctl start httpd'
+  - name: firewalld
+    firewalld:
+      port: 80/tcp
+      state: enabled
+
+    
