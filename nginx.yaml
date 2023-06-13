@@ -1,0 +1,76 @@
+---
+- name: install nignx & config nginx
+  hosts: db1
+  tasks:
+  - name: install epel & nginx
+    yum:
+      name: "{{ item }}"
+      state: present
+    loop:
+      - epel-release
+      - nginx
+ 
+  - name: change web root directory
+    replace:
+      path: /etc/nginx/nginx.conf
+      regexp: '/usr/share/nginx/html;'
+      replace: '/html;'
+ 
+  - name: mkdir /html
+    file:
+      path: /html
+      state: directory
+ 
+#  - name: nginx index.html copy
+#    copy:
+#      src: ./usr/share/html/index.html
+#      dest: /html/hoho.html
+#      remote_src: yes
+
+  - name: file into directory
+    file:
+      path: /html/hoho.html
+      state: touch        
+  
+  - name: html block in file
+    blockinfile:
+      path: /html/hoho.html
+      marker: "<!-- {mark} ANSIBLE MANAGED BLOCK -->"
+      block: |
+        <html>
+        <body>
+        <h1> jh-nginx-webserver </h1>
+        </body>
+        </html>
+
+#  - name: web root directory root hoho.html insert
+#    blockinfile:
+#      path: /etc/nginx/nginx.conf
+#      insertbefore: '# Load'
+#      block: |
+#        index  hoho.html;
+
+#  - name: insert hoho.html
+#    lineinfile:
+#      path: /etc/nginx/nginx.conf
+#      regexp: '^'
+#      insertbefore: '# Load configuration files'
+#      line: index    hoho.html;
+
+  - name: web root directory change
+    blockinfile:
+      path: /etc/nginx/nginx.conf
+      insertafter: '^(\s+server_name\s+)_;'
+      block: |
+        # jh
+               index       hoho.html;
+
+  - name: firewall open
+    firewalld:
+      port: 80/tcp
+      state: enabled
+
+  - name: nginx daemon start
+    service: 
+      name: nginx
+      state: started 
