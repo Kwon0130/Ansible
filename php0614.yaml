@@ -1,0 +1,135 @@
+---
+- name: nginx wordpress mysql install
+  hosts: php1
+  tasks:
+  - name: wget yum-utils epel istall
+    yum:
+      name: "{{ item }}"
+      state: present
+    loop:
+      - wget
+      - yum-utils
+      - epel-release
+      - nginx
+
+  - name: wordpress install
+    get_url: 
+      url: https://ko.wordpress.org/wordpress-5.8.6-ko_KR.tar.gz
+      dest: ./
+
+  - name: unarchive wordpress
+    unarchive:
+      src: wordpress-5.8.6-ko_KR.tar.gz
+      dest: ./
+      remote_src: yes
+
+  - name: copy wordpress
+    copy: 
+      src: "{{ item.src }}"
+      dest: "{{ item.dest }}"
+      remote_src: yes
+    loop:
+      - {src: './wordpress/', dest: '/usr/share/nginx/html'}
+      - {src: '/usr/share/nginx/html/wp-config-sample.php', dest: '/usr/share/nginx/html/wp-config.php'}
+
+#  - name: copy php
+#    shell:
+#      'cp -a wordpress/* /usr/share/nginx/html/'
+
+#  - name: copy php
+#    shell:
+#      'cp /usr/share/nginx/html/{wp-config-sample.php,wp-config.php}'
+
+  - name: rpm install
+    yum:
+      name: http://rpms.remirepo.net/enterprise/remi-release-7.rpm
+      state: present
+  
+  - name: php version 74
+    shell: 
+      'yum-config-manager --enable remi-php74'
+
+  - name: php series install
+    yum:
+      name: "{{ item }}"
+      state: present
+    loop:
+      - php
+      - php-cli
+      - php-curl
+      - php-mcrypt
+      - php-gd
+      - php-opcache
+      - php-common
+      - php-mysqlnd
+      - php-fpm
+
+  - name: change php-fpm.d 
+    replace: 
+      path: /etc/php-fpm.d/www.conf
+      regexp: "{{ item.src }}"
+      replace: "{{ item.dest }}"
+    loop:
+      - {src: 'user = apache', dest: 'user = nginx'}
+      - {src: 'group = apache', dest: 'group = nginx'}
+      - {src: ';listen.owner = nobody', dest: 'listen.owner = nginx'}
+      - {src: ';listen.group = nobody', dest: 'listen.group = nginx'}
+      - {src: 'listen = 127.0.0.1:9000', dest: 'listen = /run/php-fpm/www.sock'}
+
+#  - name: change config /etc/php-fpm.d/www.conf
+#    replace:
+#      path: /etc/php-fpm.d/www.conf
+#      regexp: 'listen = 127.0.0.1:9000'
+#      replace: ';listen = 127.0.0.1:9000'
+
+#  - name: web root directory change
+#    blockinfile:
+#      path: /etc/nginx/nginx.conf
+#      insertafter: '^(\s+server_name\s+)_;'
+#      block: |
+#        # jh
+#                index       index.php;
+  
+  - name: nginx.conf change
+    blockinfile:
+      path: /etc/nginx/nginx.conf
+      insertbefore: '^(\s+error_page+\s)404 /404.html;'
+      block: |
+        # jh
+                index    index.php;
+                location ~ \.php$ {
+                    try_files $uri =404;
+                    fastcgi_pass unix:/run/php-fpm/www.sock;
+                    fastcgi_index   index.php;
+                    fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+                    include fastcgi_params;
+                }
+       
+  - name: wp-config.php file change
+    replace:
+      path: /usr/share/nginx/html/wp-config.php
+      regexp: "{{ item.src }}"
+      replace: "{{ item.dest }}"
+    loop:
+      - {src: "database_name_here", dest: "wordpress"}
+      - {src: "username_here", dest: "root"}
+      - {src: "password_here", dest: "It12345@"}
+      - {src: "localhost", dest: "10.0.0.4"}
+    
+  - name: systemd start
+    systemd:  
+      name: php-fpm
+      state: started
+
+  - name: systemd start
+    systemd:
+      name: nginx
+      state: started
+
+  - name: firewall add port
+    firewalld:
+      port: 80/tcp
+      state: enabled
+      permanent: yes
+      immediate: yes
+
